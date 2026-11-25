@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101512">
+<title>Projeto 30 Dias</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#0c100e;--panel:#171e19;--line:#29352d;--muted:#9ba99f;--green:#a3e635;--white:#f4f7f4}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--white);font:16px system-ui,-apple-system,sans-serif}
+main{max-width:650px;margin:auto;padding:20px 16px 48px}.top{display:flex;justify-content:space-between;align-items:center;margin:8px 0 20px}
+.brand{font-size:12px;letter-spacing:2px;color:var(--green);font-weight:800}.pill{border:1px solid var(--line);border-radius:30px;padding:7px 11px;color:var(--muted);font-size:12px}
+h1{font-size:32px;line-height:1.05;margin:8px 0}h2{font-size:18px;margin:0 0 14px}p{color:var(--muted);margin:6px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin:14px 0}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{background:#202a23;border-radius:14px;padding:13px}.num{font-size:25px;font-weight:800}.small{font-size:12px;color:var(--muted)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.meal{padding:13px 0;border-bottom:1px solid var(--line)}.meal:last-child{border:0}
+button{border:0;border-radius:12px;padding:12px 15px;background:var(--green);color:#14200e;font-weight:800;font-size:14px;cursor:pointer}
+button.secondary{background:#29352d;color:var(--white);border:1px solid #3a493e}button.done{background:#29452c;color:#c5f7a0}
+input,textarea{width:100%;background:#0e1410;border:1px solid var(--line);border-radius:11px;padding:12px;color:var(--white);font:inherit;margin:5px 0 12px}
+label{font-size:13px;color:var(--muted)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions{display:flex;gap:8px;flex-wrap:wrap}
+.hidden{display:none!important}.status{font-size:12px;color:var(--muted);min-height:18px}.green{color:var(--green)}
+.progress{height:8px;background:#29352d;border-radius:9px;overflow:hidden;margin:10px 0}.bar{height:100%;background:var(--green);width:0%}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
+</style></head>
+<body><main>
+<div class="top"><div class="brand">PROJETO 30 DIAS</div><div class="pill" id="sync">Não conectado</div></div>
+<section id="auth" class="card">
+<h1>Vamos crescer. 💪</h1><p>Entre ou crie sua conta para salvar seu diário na nuvem.</p>
+<label>E-mail</label><input id="email" type="email" autocomplete="email" placeholder="voce@email.com">
+<label>Senha</label><input id="password" type="password" autocomplete="current-password" placeholder="Mínimo de 6 caracteres">
+<div class="actions"><button id="signup">Criar conta</button><button class="secondary" id="login">Entrar</button></div>
+<p class="status" id="authMsg"></p>
+</section>
+<section id="app" class="hidden">
+<div class="row"><div><p class="brand">SEU CICLO</p><h1 id="dayTitle">Dia 1/30</h1><p id="dateLabel"></p></div><button class="secondary" id="logout">Sair</button></div>
+<div class="card">
+<div class="stats">
+<div class="stat"><div class="num" id="mealCount">0/6</div><div class="small">Refeições concluídas</div></div>
+<div class="stat"><div class="num" id="weightDisplay">— kg</div><div class="small">Peso registrado hoje</div></div>
+</div><div class="progress"><div class="bar" id="progressBar"></div></div>
+<div class="small" id="progressText">0% do dia registrado</div>
+</div>
+<div class="card"><h2>🍽️ Alimentação de hoje</h2><div id="meals"></div></div>
+<div class="card"><h2>📈 Check-in diário</h2>
+<div class="grid">
+<div><label>Peso (kg)</label><input id="weight" type="number" step="0.1" placeholder="66.0"></div>
+<div><label>Água (ml)</label><input id="water" type="number" step="250" placeholder="2000"></div>
+<div><label>Sono (horas)</label><input id="sleep" type="number" step="0.5" placeholder="7.5"></div>
+<div><label>Fome/apetite (1 a 5)</label><input id="appetite" type="number" min="1" max="5" placeholder="3"></div>
+</div>
+<label>Treino de hoje / observações</label><textarea id="training" rows="2" placeholder="Ex.: treino de superiores, cargas, como me senti..."></textarea>
+<label>Observações gerais</label><textarea id="notes" rows="2" placeholder="Fome, disposição, dificuldades..."></textarea>
+<div class="actions"><button id="save">Salvar check-in</button><button class="secondary" id="today">Ir para hoje</button></div><p class="status" id="saveMsg"></p>
+</div>
+<div class="card"><h2>🗓️ Histórico do ciclo</h2><label>Escolher dia para consultar/editar</label><input id="date" type="date"><p class="small">Os registros são guardados por data na sua conta.</p><button class="secondary" id="export">Exportar meus dados (JSON)</button></div>
+</section>
+<footer>Seus registros ficam associados à sua conta. Faça login em outro aparelho para acessar o histórico.</footer>
+</main>
+<script>
+const SUPABASE_URL = "https://lfsgkgjjwbxicocpoysn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_2EwSCugMhep_UKqsrv00VA_kD-I_mte";
+const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = id => document.getElementById(id);
+const mealDefs = [
+ ['pre','Pré-treino'],['post','Pós-treino'],['snack1','Lanche da manhã'],
+ ['lunch','Almoço'],['snack2','Lanche da tarde'],['dinner','Jantar']
+];
+const start = new Date('2026-11-25T12:00:00');
+let user=null, selectedDate=localDate();
+function localDate(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+function cycleDay(date){const d=new Date(date+'T12:00:00');return Math.max(1,Math.min(30,Math.floor((d-start)/86400000)+1))}
+function msg(id,t){$(id).textContent=t}
+function setConnected(ok){$('sync').textContent=ok?'☁ Sincronizado':'Conectando...'}
+async function authState(){const {data:{session}}=await client.auth.getSession();user=session?.user||null;$('auth').classList.toggle('hidden',!!user);$('app').classList.toggle('hidden',!user);if(user){setConnected(true);$('date').value=selectedDate;await loadDay()}}
+client.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;$('auth').classList.toggle('hidden',!!user);$('app').classList.toggle('hidden',!user);if(user){setConnected(true);setTimeout(()=>loadDay(),0)}});
+$('signup').onclick=async()=>{const email=$('email').value.trim(),password=$('password').value; if(!email||password.length<6)return msg('authMsg','Informe e-mail e senha com pelo menos 6 caracteres.');msg('authMsg','Criando conta...');const {error}=await client.auth.signUp({email,password});msg('authMsg',error?error.message:'Conta criada! Se a confirmação por e-mail estiver ativa, confirme seu endereço e depois entre.')};
+$('login').onclick=async()=>{const {error}=await client.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});msg('authMsg',error?error.message:'Entrando...')};
+$('logout').onclick=()=>client.auth.signOut();
+function renderMeals(rows){const map=Object.fromEntries(rows.map(x=>[x.meal_key,x]));$('meals').innerHTML='';mealDefs.forEach(([key,name])=>{const done=!!map[key]?.completed;const div=document.createElement('div');div.className='row meal';const span=document.createElement('span');span.textContent=name;const b=document.createElement('button');b.className=done?'done':'secondary';b.textContent=done?'✓ Feita':'Marcar feita';b.onclick=()=>toggleMeal(key,!done);div.append(span,b);$('meals').append(div)});const count=mealDefs.filter(([k])=>map[k]?.completed).length;$('mealCount').textContent=count+'/6';$('progressBar').style.width=(count/6*100)+'%';$('progressText').textContent=Math.round(count/6*100)+'% das refeições concluídas'}
+async function toggleMeal(key,completed){setConnected(false);const {error}=await client.from('meal_logs').upsert({user_id:user.id,log_date:selectedDate,meal_key:key,completed},{onConflict:'user_id,log_date,meal_key'});if(error){msg('saveMsg','Erro ao salvar: '+error.message);setConnected(true);return}await loadMeals();setConnected(true)}
+async function loadMeals(){const {data,error}=await client.from('meal_logs').select('*').eq('log_date',selectedDate);if(error){msg('saveMsg','Erro ao carregar refeições: '+error.message);return}renderMeals(data||[])}
+async function loadDay(){if(!user)return; $('dateLabel').textContent=new Date(selectedDate+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});$('dayTitle').textContent='Dia '+cycleDay(selectedDate)+'/30';$('date').value=selectedDate;setConnected(false);
+const {data,error}=await client.from('daily_logs').select('*').eq('log_date',selectedDate).maybeSingle();if(error){msg('saveMsg','Banco ainda não configurado: '+error.message);return}
+$('weight').value=data?.weight_kg??'';$('water').value=data?.water_ml??'';$('sleep').value=data?.sleep_hours??'';$('appetite').value=data?.appetite??'';$('training').value=data?.training_notes??'';$('notes').value=data?.notes??'';$('weightDisplay').textContent=data?.weight_kg?Number(data.weight_kg).toFixed(1)+' kg':'— kg';
+await loadMeals();setConnected(true)}
+$('save').onclick=async()=>{if(!user)return;setConnected(false);const row={user_id:user.id,log_date:selectedDate,weight_kg:$('weight').value?Number($('weight').value):null,water_ml:Number($('water').value||0),sleep_hours:$('sleep').value?Number($('sleep').value):null,appetite:$('appetite').value?Number($('appetite').value):null,trained:!!$('training').value.trim(),training_notes:$('training').value,notes:$('notes').value,updated_at:new Date().toISOString()};const {error}=await client.from('daily_logs').upsert(row,{onConflict:'user_id,log_date'});if(error)msg('saveMsg','Não salvou: '+error.message);else{msg('saveMsg','✓ Check-in salvo na nuvem!');$('weightDisplay').textContent=row.weight_kg?row.weight_kg.toFixed(1)+' kg':'— kg'}setConnected(true)};
+$('date').onchange=async()=>{selectedDate=$('date').value||localDate();await loadDay()};
+$('today').onclick=async()=>{selectedDate=localDate();await loadDay()};
+$('export').onclick=async()=>{const [{data:a,error:e1},{data:b,error:e2}]=await Promise.all([client.from('daily_logs').select('*').order('log_date'),client.from('meal_logs').select('*').order('log_date')]);if(e1||e2)return msg('saveMsg','Erro ao exportar. Verifique o banco.');const blob=new Blob([JSON.stringify({daily_logs:a,meal_logs:b},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='projeto-30-dias-dados.json';link.click();URL.revokeObjectURL(url)};
+authState();
+</script></body></html>
